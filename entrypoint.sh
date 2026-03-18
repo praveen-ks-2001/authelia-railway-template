@@ -20,7 +20,7 @@ export AUTHELIA_DEFAULT_2FA_METHOD="${AUTHELIA_DEFAULT_2FA_METHOD:-totp}"
 # Secrets — Railway should inject these via ${{secret(32)}}
 export AUTHELIA_SESSION_SECRET="${AUTHELIA_SESSION_SECRET:?ERROR: AUTHELIA_SESSION_SECRET is required}"
 export AUTHELIA_STORAGE_ENCRYPTION_KEY="${AUTHELIA_STORAGE_ENCRYPTION_KEY:?ERROR: AUTHELIA_STORAGE_ENCRYPTION_KEY is required}"
-export AUTHELIA_JWT_SECRET="${AUTHELIA_JWT_SECRET:?ERROR: AUTHELIA_JWT_SECRET is required}"
+export AUTH_JWT_SECRET="${AUTH_JWT_SECRET:?ERROR: AUTH_JWT_SECRET is required}"
 
 # Session
 export SESSION_NAME="${SESSION_NAME:-authelia_session}"
@@ -32,11 +32,13 @@ export SESSION_REMEMBER_ME="${SESSION_REMEMBER_ME:-1M}"
 export ACCESS_CONTROL_DEFAULT_POLICY="${ACCESS_CONTROL_DEFAULT_POLICY:-two_factor}"
 
 # Storage — PostgreSQL
-export AUTHELIA_STORAGE_POSTGRES_HOST="${AUTHELIA_STORAGE_POSTGRES_HOST:?ERROR: AUTHELIA_STORAGE_POSTGRES_HOST is required}"
-export AUTHELIA_STORAGE_POSTGRES_PORT="${AUTHELIA_STORAGE_POSTGRES_PORT:-5432}"
-export AUTHELIA_STORAGE_POSTGRES_DATABASE="${AUTHELIA_STORAGE_POSTGRES_DATABASE:-authelia}"
-export AUTHELIA_STORAGE_POSTGRES_USERNAME="${AUTHELIA_STORAGE_POSTGRES_USERNAME:?ERROR: AUTHELIA_STORAGE_POSTGRES_USERNAME is required}"
-export AUTHELIA_STORAGE_POSTGRES_PASSWORD="${AUTHELIA_STORAGE_POSTGRES_PASSWORD:?ERROR: AUTHELIA_STORAGE_POSTGRES_PASSWORD is required}"
+# Note: NOT prefixed with AUTHELIA_ to avoid conflicting with Authelia's deprecated
+# storage.postgres.host/port keys (which conflict with the new storage.postgres.address key)
+export PG_HOST="${PG_HOST:?ERROR: PG_HOST is required}"
+export PG_PORT="${PG_PORT:-5432}"
+export PG_DATABASE="${PG_DATABASE:-authelia}"
+export PG_USERNAME="${PG_USERNAME:?ERROR: PG_USERNAME is required}"
+export PG_PASSWORD="${PG_PASSWORD:?ERROR: PG_PASSWORD is required}"
 
 # Redis
 export AUTHELIA_SESSION_REDIS_HOST="${AUTHELIA_SESSION_REDIS_HOST:?ERROR: AUTHELIA_SESSION_REDIS_HOST is required}"
@@ -132,7 +134,7 @@ telemetry:
 
 identity_validation:
   reset_password:
-    jwt_secret: ${AUTHELIA_JWT_SECRET}
+    jwt_secret: ${AUTH_JWT_SECRET}
 
 authentication_backend:
   password_reset:
@@ -167,10 +169,10 @@ session:
 storage:
   encryption_key: ${AUTHELIA_STORAGE_ENCRYPTION_KEY}
   postgres:
-    address: tcp://${AUTHELIA_STORAGE_POSTGRES_HOST}:${AUTHELIA_STORAGE_POSTGRES_PORT}
-    database: ${AUTHELIA_STORAGE_POSTGRES_DATABASE}
-    username: ${AUTHELIA_STORAGE_POSTGRES_USERNAME}
-    password: ${AUTHELIA_STORAGE_POSTGRES_PASSWORD}
+    address: tcp://${PG_HOST}:${PG_PORT}
+    database: ${PG_DATABASE}
+    username: ${PG_USERNAME}
+    password: ${PG_PASSWORD}
     tls:
       skip_verify: true
 
