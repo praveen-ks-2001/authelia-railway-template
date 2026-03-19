@@ -208,7 +208,7 @@ echo "==> configuration.yml written."
 # 3. GENERATE users_database.yml (only if it doesn't already exist)
 #
 # Two modes:
-#   Multi-user:  Set AUTHELIA_USERS="user|pass|email|display|groups;user2|..."
+#   Multi-user:  Set AUTH_USERS="user|pass|email|display|groups;user2|..."
 #                Fields after password are optional. Groups are comma-separated.
 #                Example: "alice|pass1|alice@example.com|Alice|admins,users;bob|pass2"
 #
@@ -239,9 +239,9 @@ if [[ ! -f "$USERS_FILE" ]]; then
 users:
 HEADER
 
-  if [[ -n "${AUTHELIA_USERS:-}" ]]; then
+  if [[ -n "${AUTH_USERS:-}" ]]; then
     # --------------- Multi-user mode ---------------
-    IFS=';' read -ra USER_ENTRIES <<< "$AUTHELIA_USERS"
+    IFS=';' read -ra USER_ENTRIES <<< "$AUTH_USERS"
     for entry in "${USER_ENTRIES[@]}"; do
       IFS='|' read -ra f <<< "$entry"
       u_name="${f[0]:-}"
