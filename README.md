@@ -10,11 +10,11 @@ Authelia is a self-hosted authentication and authorization server providing:
 
 ## Stack
 
-| Service    | Purpose                          |
-|------------|----------------------------------|
-| Authelia   | Auth portal (this repo)          |
-| PostgreSQL | Persistent storage               |
-| Redis      | Session cache                    |
+| Service    | Purpose                                                  |
+|------------|----------------------------------------------------------|
+| Authelia   | Auth portal (this repo)                                  |
+| PostgreSQL | Persistent storage (sessions, TOTP secrets, OIDC tokens) |
+| Redis      | Session cache                                            |
 
 ## Deploy on Railway
 
@@ -27,54 +27,135 @@ Authelia is a self-hosted authentication and authorization server providing:
 3. Add a **PostgreSQL** service
 4. Add a **Redis** service
 5. Add a new service from your forked repo
-6. Mount a **volume** on the Authelia service at `/config`
-7. Set environment variables (see `.env.example` or the table below)
-8. Deploy
+6. Set environment variables (see `.env.example` or the tables below)
+7. Deploy
 
 ## Required Environment Variables
 
 | Variable | Description |
 |---|---|
-| `AUTHELIA_DOMAIN` | Your root domain (e.g. `example.com`) |
+| `AUTHELIA_DOMAIN` | Your root domain (e.g. `example.com`) — no `https://` prefix |
 | `AUTHELIA_AUTH_URL` | Full public HTTPS URL of Authelia (e.g. `https://auth.example.com`) |
 | `AUTHELIA_SESSION_SECRET` | Random secret for session signing — use `${{secret(32)}}` |
 | `AUTHELIA_STORAGE_ENCRYPTION_KEY` | Random encryption key — use `${{secret(32)}}` |
-| `AUTHELIA_JWT_SECRET` | JWT secret for password reset — use `${{secret(32)}}` |
-| `AUTHELIA_STORAGE_POSTGRES_HOST` | Reference: `${{Postgres.PGHOST}}` |
-| `AUTHELIA_STORAGE_POSTGRES_PORT` | Reference: `${{Postgres.PGPORT}}` |
-| `AUTHELIA_STORAGE_POSTGRES_DATABASE` | Reference: `${{Postgres.PGDATABASE}}` |
-| `AUTHELIA_STORAGE_POSTGRES_USERNAME` | Reference: `${{Postgres.PGUSER}}` |
-| `AUTHELIA_STORAGE_POSTGRES_PASSWORD` | Reference: `${{Postgres.PGPASSWORD}}` |
+| `AUTH_JWT_SECRET` | JWT secret for password reset — use `${{secret(32)}}` |
+| `PG_HOST` | Reference: `${{Postgres.PGHOST}}` |
+| `PG_PORT` | Reference: `${{Postgres.PGPORT}}` |
+| `PG_DATABASE` | Reference: `${{Postgres.PGDATABASE}}` |
+| `PG_USERNAME` | Reference: `${{Postgres.PGUSER}}` |
+| `PG_PASSWORD` | Reference: `${{Postgres.PGPASSWORD}}` |
 | `AUTHELIA_SESSION_REDIS_HOST` | Reference: `${{Redis.REDISHOST}}` |
 | `AUTHELIA_SESSION_REDIS_PORT` | Reference: `${{Redis.REDISPORT}}` |
-| `AUTHELIA_SESSION_REDIS_PASSWORD` | Reference: `${{Redis.REDIS_PASSWORD}}` |
-| `AUTHELIA_INIT_PASSWORD` | Password for the initial admin user (first boot only) |
+| `AUTHELIA_SESSION_REDIS_PASSWORD` | Reference: `${{Redis.REDISPASSWORD}}` |
+| `PORT` | Must be `9091` |
+| `RAILWAY_RUN_UID` | Must be `0` |
 
-See `.env.example` for the full list of optional variables (SMTP, OIDC, session tuning, etc.).
+## User Management
+
+### Multi-user (recommended)
+
+Set `AUTH_USERS` as a semicolon-separated list of users. Each user is pipe-separated:
+
+```
+AUTH_USERS="username|password|email|display name|groups"
+```
+
+Fields after password are optional. Groups are comma-separated. Example with two users:
+
+```
+AUTH_USERS="alice|strongpass1|alice@example.com|Alice Smith|admins,users;bob|strongpass2|bob@example.com|Bob Jones|users"
+```
+
+Minimal (username and password only):
+
+```
+AUTH_USERS="alice|strongpass1"
+```
+
+### Single-user (legacy)
+
+If `AUTH_USERS` is not set, the following vars are used instead:
+
+| Variable | Description |
+|---|---|
+| `AUTHELIA_INIT_USERNAME` | Username for the initial admin (default: `admin`) |
+| `AUTHELIA_INIT_PASSWORD` | Password for the initial admin |
+| `AUTHELIA_INIT_EMAIL` | Email for the initial admin (optional) |
+| `AUTHELIA_INIT_DISPLAY_NAME` | Display name for the initial admin (optional) |
+
+### How users work
+
+- Users are seeded into `/config/users_database.yml` on **first boot only**. Subsequent restarts skip this step.
+- Authelia watches the file live — changes take effect without a restart.
+- To re-seed users (e.g. after updating `AUTH_USERS`), delete `users_database.yml` from the volume and redeploy.
+- Postgres stores TOTP secrets, WebAuthn credentials, OIDC tokens, and session data — not the user list itself.
+
+## Access Control
+
+By default, `ACCESS_CONTROL_DEFAULT_POLICY` is set to `two_factor`. This requires users to register a TOTP or WebAuthn device after first login.
+
+> **Note:** Registering a 2FA device requires Authelia to send a verification email. Without SMTP configured, this email is written to `/config/notifications.txt` on the volume and cannot be delivered. Set `ACCESS_CONTROL_DEFAULT_POLICY=one_factor` to use username + password only, or configure SMTP to enable full 2FA.
+
+| Policy | Behaviour |
+|---|---|
+| `one_factor` | Username + password only |
+| `two_factor` | Username + password + TOTP or WebAuthn (requires SMTP for device registration) |
+
+## Optional Variables
+
+See `.env.example` for the full list. Key optional vars:
+
+| Variable | Default | Description |
+|---|---|---|
+| `ACCESS_CONTROL_DEFAULT_POLICY` | `two_factor` | `one_factor` or `two_factor` |
+| `AUTHELIA_LOG_LEVEL` | `info` | `trace`, `debug`, `info`, `warn`, `error` |
+| `SMTP_HOST` | — | Enables email delivery for 2FA and password reset |
+| `OIDC_CLIENT_ID` | — | Enables OpenID Connect provider |
 
 ## How it works
 
 On every container start, `entrypoint.sh`:
 
-1. Reads all environment variables
+1. Validates all required environment variables
 2. Generates `/config/configuration.yml` from scratch
-3. On **first boot** only: hashes `AUTHELIA_INIT_PASSWORD` using Argon2id and writes `/config/users_database.yml`
+3. On **first boot** only: hashes passwords and writes `/config/users_database.yml`
 4. Hands off to the Authelia binary
 
-This means you can change any setting by updating an env var and redeploying — no manual file editing needed.
+Changing any setting is as simple as updating an env var and redeploying — no manual file editing needed.
 
-## First boot notes
+## SMTP (optional)
 
-- `AUTHELIA_INIT_PASSWORD` is only used once to seed the first user. After the first successful deploy, you can remove it from Railway variables — `users_database.yml` is already written to the volume.
-- OIDC is disabled by default. Set `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`, and `AUTHELIA_OIDC_HMAC_SECRET` to enable it. An RSA key pair is generated automatically on first boot.
-- SMTP is optional. If `SMTP_HOST` is not set, email notifications are written to `/config/notifications.txt` — useful during initial testing.
+If `SMTP_HOST` is not set, Authelia uses a filesystem notifier — emails are written to `/config/notifications.txt`. This is fine for testing but means 2FA device registration and password reset won't deliver real emails.
+
+To enable SMTP:
+
+```
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USERNAME="you@gmail.com"
+SMTP_PASSWORD="your-app-password"
+SMTP_SENDER="Authelia <authelia@example.com>"
+```
+
+## OIDC (optional)
+
+Authelia can act as an OpenID Connect provider for apps like Gitea, Grafana, Nextcloud, and Outline. Set the following to enable it:
+
+```
+OIDC_CLIENT_ID="my-app"
+OIDC_CLIENT_SECRET="strong-secret"
+OIDC_REDIRECT_URI="https://my-app.example.com/oauth/callback"
+AUTHELIA_OIDC_HMAC_SECRET="strong-secret"
+```
+
+An RSA key pair is auto-generated on first boot.
 
 ## Connecting your reverse proxy
 
-Authelia is a **forward-auth middleware** — it doesn't protect anything by itself. You need a reverse proxy (Traefik, Nginx, Caddy) configured to forward auth requests to:
+Authelia is a **forward-auth middleware** — it doesn't protect anything by itself. Configure your reverse proxy (Traefik, Nginx, Caddy) to forward auth requests to:
 
 ```
-https://your-authelia-domain.up.railway.app/api/authz/forward-auth
+https://your-authelia-domain/api/authz/forward-auth
 ```
 
 Authelia listens on port `9091`.
