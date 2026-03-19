@@ -50,44 +50,20 @@ Authelia is a self-hosted authentication and authorization server providing:
 | `PORT` | Must be `9091` |
 | `RAILWAY_RUN_UID` | Must be `0` |
 
-## User Management
+## Initial User
 
-### Multi-user (recommended)
-
-Set `AUTH_USERS` as a semicolon-separated list of users. Each user is pipe-separated:
-
-```
-AUTH_USERS="username|password|email|display name|groups"
-```
-
-Fields after password are optional. Groups are comma-separated. Example with two users:
-
-```
-AUTH_USERS="alice|strongpass1|alice@example.com|Alice Smith|admins,users;bob|strongpass2|bob@example.com|Bob Jones|users"
-```
-
-Minimal (username and password only):
-
-```
-AUTH_USERS="alice|strongpass1"
-```
-
-### Single-user (legacy)
-
-If `AUTH_USERS` is not set, the following vars are used instead:
+Set these variables to create the first user on first boot:
 
 | Variable | Description |
 |---|---|
-| `AUTHELIA_INIT_USERNAME` | Username for the initial admin (default: `admin`) |
-| `AUTHELIA_INIT_PASSWORD` | Password for the initial admin |
-| `AUTHELIA_INIT_EMAIL` | Email for the initial admin (optional) |
-| `AUTHELIA_INIT_DISPLAY_NAME` | Display name for the initial admin (optional) |
-
-### How users work
+| `INIT_USERNAME` | Username (default: `admin`) |
+| `INIT_PASSWORD` | Password — required on first boot |
+| `INIT_EMAIL` | Email (optional, defaults to `username@domain`) |
+| `INIT_DISPLAY_NAME` | Display name (optional, defaults to `Administrator`) |
 
 - Users are seeded into `/config/users_database.yml` on **first boot only**. Subsequent restarts skip this step.
 - Authelia watches the file live — changes take effect without a restart.
-- To re-seed users (e.g. after updating `AUTH_USERS`), delete `users_database.yml` from the volume and redeploy.
+- To add more users after first boot, edit `users_database.yml` directly on the volume.
 - Postgres stores TOTP secrets, WebAuthn credentials, OIDC tokens, and session data — not the user list itself.
 
 ## Access Control
