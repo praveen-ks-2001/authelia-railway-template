@@ -159,35 +159,21 @@ Authelia wins on resource usage and simplicity. Choose Authentik or Keycloak if 
 
 ## Adding Multiple Users
 
-This template seeds one user on first boot. To add more users after deployment:
+This template seeds one user on first boot via `INIT_USERNAME` and `INIT_PASSWORD`. To add more users, deploy a [Filebrowser](https://railway.com/deploy/Nan7Bs) service in the same Railway project, mount the Authelia `/config` volume on it, and edit `users_database.yml` directly. Authelia watches the file live — no restart needed.
 
-1. **Deploy a Filebrowser service** in the same Railway project — [![Deploy on Railway](https://railway.app/button.svg)](https://railway.com/deploy/Nan7Bs)
-2. **Mount the Authelia volume** (`/config`) on the Filebrowser service
-3. Open Filebrowser, navigate to `users_database.yml`, and add new user entries in this format:
+New user entries follow this format:
 
 ```yaml
-users:
-  existing_user:
-    disabled: false
-    displayname: "Existing User"
-    password: "$argon2id$..."   # keep existing hash
-    email: existing@example.com
-    groups:
-      - users
-
   new_user:
     disabled: false
     displayname: "New User"
-    password: "$argon2id$..."   # generate with: authelia crypto hash generate argon2 --password "yourpassword"
+    password: "$argon2id$..."
     email: newuser@example.com
     groups:
       - users
 ```
 
-4. **Detach the volume from Filebrowser** and reattach it to Authelia
-5. Authelia watches the file live — changes take effect immediately with no restart needed
-
-> To generate a password hash without a running Authelia instance, use the [Authelia CLI](https://www.authelia.com/reference/cli/authelia/authelia_crypto_hash_generate_argon2/) locally: `authelia crypto hash generate argon2 --password "yourpassword"`
+To generate a password hash: `authelia crypto hash generate argon2 --password "yourpassword"`
 
 ## How Much Does Authelia Cost?
 
